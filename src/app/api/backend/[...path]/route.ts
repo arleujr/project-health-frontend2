@@ -1,23 +1,96 @@
 import { cookies } from 'next/headers';
 
-async function handler(request: Request, context: { params: Promise<{ path: string[] }> }) {
-  const backendUrl = process.env.BACKEND_URL;
-  if (!backendUrl) return Response.json({ message: 'BACKEND_URL não configurada.' }, { status: 500 });
+import { getBackendUrl } from '@/config/backend';
+
+interface RouteContext {
+  params: Promise<{
+    path: string[];
+  }>;
+}
+
+async function handler(
+  request: Request,
+  context: RouteContext,
+) {
+  const backendUrl = getBackendUrl();
+
   const { path } = await context.params;
-  const incoming = new URL(request.url);
-  const target = `${backendUrl.replace(/\/$/, '')}/${path.join('/')}${incoming.search}`;
-  const token = (await cookies()).get('ph_session')?.value;
+
+  const incomingUrl = new URL(request.url);
+
+  const targetUrl =
+    `${backendUrl}/${path.join('/')}${incomingUrl.search}`;
+
+  const sessionCookie = (await cookies()).get(
+    'ph_session',
+  );
+
   const headers = new Headers();
+
   headers.set('accept', 'application/json');
-  const contentType = request.headers.get('content-type');
-  if (contentType) headers.set('content-type', contentType);
-  if (token) headers.set('authorization', `Bearer ${token}`);
-  const body = ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer();
-  const response = await fetch(target, { method: request.method, headers, body, cache: 'no-store' });
-  const responseHeaders = new Headers();
-  const responseType = response.headers.get('content-type');
-  if (responseType) responseHeaders.set('content-type', responseType);
-  return new Response(response.body, { status: response.status, headers: responseHeaders });
+
+  const contentType =
+    request.headers.get('content-type');
+
+  if (contentType) {
+    headers.set('content-type', contentType);
+  }
+
+  if (sessionCookie?.value) {
+    headers.set(
+      'authorization',
+      `Bearer ${sessionCookie.value}`,
+    );
+  }
+
+  const hasBody = !['GET', 'HEAD'].includes(
+    request.method,
+  );
+
+  const body = hasBody
+    ? await request.arrayBuffer()
+    : undefined;
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: request.method,
+      headers,
+      body,
+      cache: 'no-store',
+    });
+
+    const responseHeaders = new Headers();
+
+    const responseContentType =
+      response.headers.get('content-type');
+
+    if (responseContentType) {
+      responseHeaders.set(
+        'content-type',
+        responseContentType,
+      );
+    }
+
+    return new Response(response.body, {
+      status: response.status,
+      headers: responseHeaders,
+    });
+  } catch (error) {
+    console.error(
+      `Erro ao chamar backend: ${targetUrl}`,
+      error,
+    );
+
+    return Response.json(
+      {
+        message:
+          'Não foi possível conectar ao backend.',
+      },
+      {
+        status: 502,
+      },
+    );
+  }
 }
 
 export const GET = handler;
