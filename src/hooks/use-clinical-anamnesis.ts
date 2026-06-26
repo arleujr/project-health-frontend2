@@ -44,7 +44,7 @@ export function useClinicalAnamnesis() {
       setError(null);
 
       // 🚀 Chamada Stateless com JWT para o seu backend atual
-      await api.post('/v1/patients/anamnesis', formData);
+      await api.post('/v1/onboarding/anamnesis', formData);
 
       // Sucesso! Volta pro dashboard (onde o status passará a ser COMPLETED)
       router.push('/me');
