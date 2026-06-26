@@ -1,70 +1,135 @@
-'use client';
+import {
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react';
 
-import React, { useState } from 'react';
-import { ArrowRight, Target, AlertTriangle, User, Sparkles } from 'lucide-react';
-import { useOnboarding } from '@/hooks/use-onboarding';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Sparkles,
+  Target,
+  User,
+} from 'lucide-react';
+
+import {
+  useOnboarding,
+  type BasicProfileData,
+} from '@/hooks/use-onboarding';
 
 export default function OnboardingPage() {
-  // 🔗 Acoplando a lógica de negócio separada
-  const { submitProgressiveProfile, isLoading, error, setError } = useOnboarding();
+  const {
+    submitProgressiveProfile,
+    isLoading,
+    error,
+    setError,
+  } = useOnboarding();
 
-  // 📝 Estado local apenas para os inputs da UI
-  const [formData, setFormData] = useState({
-    name: '',
-    goal: '',
-    restriction: ''
-  });
+  const [formData, setFormData] =
+    useState<BasicProfileData>({
+      name: '',
+      goal: '',
+      restriction: '',
+      termsAccepted: false,
+      privacyAccepted: false,
+    });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    if (error) setError(null); // Limpa o erro assim que o usuário volta a digitar
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (
+    event: ChangeEvent<
+      HTMLInputElement |
+      HTMLSelectElement |
+      HTMLTextAreaElement
+    >,
+  ) => {
+    setError(null);
+
+    const target = event.target;
+
+    if (
+      target instanceof HTMLInputElement &&
+      target.type === 'checkbox'
+    ) {
+      setFormData((previous) => ({
+        ...previous,
+        [target.name]: target.checked,
+      }));
+
+      return;
+    }
+
+    setFormData((previous) => ({
+      ...previous,
+      [target.name]: target.value,
+    }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await submitProgressiveProfile(formData);
+  const handleSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+
+    await submitProgressiveProfile(
+      formData,
+    );
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-        
-        {/* Header Premium */}
-        <div className="bg-slate-900 px-8 py-10 text-center relative overflow-hidden">
-          <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-slate-800 rounded-full opacity-50 blur-2xl"></div>
-          <Sparkles className="h-8 w-8 text-amber-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">Bem-vindo(a) ao Health Core</h1>
-          <p className="text-slate-400 text-sm mt-2">Vamos personalizar sua experiência em 30 segundos.</p>
-        </div>
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+      <section className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xl">
+        <header className="relative overflow-hidden bg-slate-900 px-8 py-10 text-center">
+          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-slate-800 opacity-50 blur-2xl" />
 
-        {/* Formulário - Progressive Profiling Fase 1 */}
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          
-          {/* Nome */}
+          <Sparkles className="mx-auto mb-4 h-8 w-8 text-amber-400" />
+
+          <h1 className="text-2xl font-extrabold tracking-tight text-white">
+            Bem-vindo ao Projeto Health
+          </h1>
+
+          <p className="mt-2 text-sm text-slate-400">
+            Vamos configurar seu perfil básico.
+            Você poderá completar os dados clínicos
+            gradualmente.
+          </p>
+        </header>
+
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-6 p-8"
+        >
           <div>
-            <label htmlFor="name" className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+            <label
+              htmlFor="name"
+              className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700"
+            >
               <User className="h-4 w-4 text-slate-400" />
-              Como podemos te chamar?
+              Como podemos chamar você?
             </label>
+
             <input
               id="name"
               name="name"
               type="text"
               required
-              placeholder="Seu nome ou apelido"
+              minLength={2}
+              maxLength={120}
+              placeholder="Seu nome"
               value={formData.name}
               onChange={handleChange}
               disabled={isLoading}
-              className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/20 transition-all outline-none disabled:opacity-50 text-slate-900"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-slate-900 focus:ring-2 focus:ring-slate-900/20 disabled:opacity-50"
             />
           </div>
 
-          {/* Objetivo Principal */}
           <div>
-            <label htmlFor="goal" className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+            <label
+              htmlFor="goal"
+              className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700"
+            >
               <Target className="h-4 w-4 text-slate-400" />
-              Qual é o seu objetivo principal hoje?
+              Qual é seu objetivo principal?
             </label>
+
             <select
               id="goal"
               name="goal"
@@ -72,64 +137,122 @@ export default function OnboardingPage() {
               value={formData.goal}
               onChange={handleChange}
               disabled={isLoading}
-              className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/20 transition-all outline-none disabled:opacity-50 text-slate-900 appearance-none"
+              className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-slate-900 focus:ring-2 focus:ring-slate-900/20 disabled:opacity-50"
             >
-              <option value="" disabled>Selecione uma meta...</option>
-              <option value="Emagrecimento">Emagrecimento / Queima de Gordura</option>
-              <option value="Hipertrofia">Hipertrofia / Ganho de Massa</option>
-              <option value="Saude">Melhorar Saúde e Disposição</option>
-              <option value="Performance">Performance Esportiva</option>
+              <option value="" disabled>
+                Selecione uma meta
+              </option>
+
+              <option value="WEIGHT_LOSS">
+                Emagrecimento
+              </option>
+
+              <option value="MUSCLE_GAIN">
+                Hipertrofia
+              </option>
+
+              <option value="HEALTH">
+                Saúde e disposição
+              </option>
+
+              <option value="PERFORMANCE">
+                Performance esportiva
+              </option>
             </select>
           </div>
 
-          {/* Restrição/Alergia (O Alerta Grave Oculto) */}
           <div>
-            <label htmlFor="restriction" className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+            <label
+              htmlFor="restriction"
+              className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700"
+            >
               <AlertTriangle className="h-4 w-4 text-slate-400" />
-              Alguma dor, restrição ou alergia grave?
+              Possui alguma dor, restrição ou alergia?
             </label>
+
             <textarea
               id="restriction"
               name="restriction"
-              placeholder="Ex: Dor no joelho ao agachar, alergia a lactose..."
+              maxLength={2000}
+              placeholder="Ex.: dor no joelho, alergia à lactose..."
               value={formData.restriction}
               onChange={handleChange}
               disabled={isLoading}
-              rows={3}
-              className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/20 transition-all outline-none disabled:opacity-50 text-slate-900 resize-none"
+              rows={4}
+              className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition-all focus:border-slate-900 focus:ring-2 focus:ring-slate-900/20 disabled:opacity-50"
             />
-            <p className="text-xs text-slate-500 mt-2">Nossa IA médica vai analisar isso imediatamente para garantir sua segurança.</p>
+
+            <p className="mt-2 text-xs text-slate-500">
+              O relato será registrado para triagem
+              e avaliação dos profissionais. A análise
+              automática não substitui avaliação
+              clínica ou atendimento de emergência.
+            </p>
           </div>
 
-          {/* Erro de UI Resiliente */}
+          <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                name="termsAccepted"
+                checked={formData.termsAccepted}
+                onChange={handleChange}
+                disabled={isLoading}
+                className="mt-1 h-4 w-4"
+              />
+
+              <span className="text-sm text-slate-700">
+                Li e aceito os termos de uso.
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                name="privacyAccepted"
+                checked={formData.privacyAccepted}
+                onChange={handleChange}
+                disabled={isLoading}
+                className="mt-1 h-4 w-4"
+              />
+
+              <span className="text-sm text-slate-700">
+                Li e aceito a política de privacidade
+                e o tratamento dos dados informados.
+              </span>
+            </label>
+          </div>
+
           {error && (
-            <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
-              <p className="text-sm font-semibold text-rose-700">{error}</p>
+            <div className="flex items-start gap-3 rounded-xl border border-rose-100 bg-rose-50 p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-500" />
+
+              <p className="text-sm font-semibold text-rose-700">
+                {error}
+              </p>
             </div>
           )}
 
-          {/* Botão de Submit com Loading State */}
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 font-bold text-white shadow-md transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                <span>Configurando seu perfil...</span>
-              </div>
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                Salvando perfil...
+              </>
             ) : (
               <>
-                Acessar Meu Plano
+                <CheckCircle2 className="h-4 w-4" />
+                Continuar para meu painel
                 <ArrowRight className="h-4 w-4" />
               </>
             )}
           </button>
-          
         </form>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

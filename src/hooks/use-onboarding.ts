@@ -1,54 +1,103 @@
-'use client';
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 
-import { useState } from 'react';
-import axios from 'axios';
-import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { OtpService } from '../../services/OtpService.js';
+import { ensureAuthenticated } from '../../../../shared/infra/http/middlewares/ensureAuthenticated.js';
+import { prisma } from '../../../../shared/infra/database/prisma.js';
 
-interface OnboardingData {
-  name: string;
-  goal: string;
-  restriction: string;
-}
+// Schema for validating email input
+const emailSchema = z.object({
+  email: z
+    .string()
+    .email()
+    .transform((value) => value.toLowerCase()),
+});
 
-export function useOnboarding() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+// Schema for verifying OTP code along with email
+const verifySchema = emailSchema.extend({
+  otpCode: z.string().regex(/^\d{6}$/),
+});
 
-  const submitProgressiveProfile = async (data: OnboardingData) => {
-    // 🛡️ Early Return: Validação rápida antes de bater no servidor
-    if (!data.name.trim() || !data.goal) {
-      setError('Por favor, preencha seu nome e o objetivo principal.');
-      return false;
-    }
+export async function authRoutes(app: FastifyInstance) {
+  const otp = new OtpService();
 
-    try {
-      setIsLoading(true);
-      setError(null);
+  // Route to request OTP
+  app.post(
+    '/request-otp',
+    {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (request, reply) => {
+      const { email } = emailSchema.parse(request.body);
 
-      // 🚀 Chamada Stateless com JWT (via interceptor configurado no pi-client)
-      // No MVP, se a rota ainda não existir no backend, o catch vai segurar com graciosidade.
-      await api.post('/v1/patients/onboarding', data);
+      const result = await otp.request(email);
 
-      // Sucesso! Redireciona para o Dashboard/Painel do Cliente
-      router.push('/dashboard');
-      return true;
+      return reply.status(202).send({
+        message: 'Se o e-mail estiver cadastrado, o código será enviado.',
+        ...result,
+      });
+    },
+  );
 
-    } catch (err: unknown) {
-      // 🛡️ Graceful Degradation: Captura o erro sem quebrar a tela
-      console.error('Falha no Onboarding:', err);
-      setError(axios.isAxiosError(err) ? (err.response?.data?.message ?? 'Ocorreu um erro ao salvar seus dados. Tente novamente.') : 'Ocorreu um erro ao salvar seus dados. Tente novamente.');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Route to verify OTP and issue JWT token
+  app.post(
+    '/verify-otp',
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (request, reply) => {
+      const { email, otpCode } = verifySchema.parse(request.body);
 
-  return {
-    submitProgressiveProfile,
-    isLoading,
-    error,
-    setError // Exportado caso a UI precise limpar o erro ao digitar
-  };
+      const user = await otp.verify(email, otpCode);
+
+      const token = app.jwt.sign({
+        sub: user.id,
+        role: user.role,
+        email: user.email,
+      });
+
+      return reply.send({
+        token,
+        user,
+      });
+    },
+  );
+
+  // Route to get authenticated user information
+  app.get(
+    '/me',
+    {
+      onRequest: [ensureAuthenticated],
+    },
+    async (request) => {
+      return prisma.user.findUniqueOrThrow({
+        where: {
+          id: request.user.sub,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isOnboardingDone: true,
+          // Added fields for onboarding and compliance tracking
+          onboardingStage: true,
+          primaryGoal: true,
+          restrictionSummary: true,
+          termsAcceptedAt: true,
+          privacyAcceptedAt: true,
+        },
+      });
+    },
+  );
 }
